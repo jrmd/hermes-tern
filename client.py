@@ -189,7 +189,7 @@ class RunnerClient:
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self._credential}",
-            "User-Agent": "hermes-tern-plugin/0.2.0",
+            "User-Agent": "hermes-tern-plugin/0.2.1",
         }
         if encoded is not None:
             headers["Content-Type"] = "application/json"
