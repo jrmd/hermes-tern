@@ -219,6 +219,44 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(response.read_limit, MAX_RESPONSE_BYTES + 1)
         self.assertEqual(output.getvalue(), '{"state":"response_too_large"}\n')
 
+    def test_main_identifies_the_plugin_to_the_runner_endpoint(self) -> None:
+        class Response:
+            def read(self, limit: int) -> bytes:
+                del limit
+                return b'{"runs":[]}'
+
+        class Opener:
+            request: object | None = None
+
+            def open(self, request: object, timeout: int) -> Response:
+                del timeout
+                self.request = request
+                return Response()
+
+        opener = Opener()
+        output = StringIO()
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "TERN_RUNNER_CREDENTIAL": "credential-sentinel",
+                    ORGANIZATION_ID_ENV: "org-1",
+                    PROJECT_ID_ENV: "project-1",
+                    "TERN_RUNNER_URL": "http://127.0.0.1:8787/api/runner/v1",
+                },
+                clear=True,
+            ),
+            patch.object(monitor_module, "build_opener", return_value=opener),
+            redirect_stdout(output),
+        ):
+            monitor_module.main()
+        self.assertIsNotNone(opener.request)
+        self.assertEqual(
+            opener.request.get_header("User-agent"),
+            "hermes-tern-plugin/0.2.3",
+        )
+        self.assertEqual(output.getvalue(), '{"runs":[],"state":"ready"}\n')
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 DEFAULT_BASE_URL = "https://gettern.app/api/runner/v1"
+USER_AGENT = "hermes-tern-plugin/0.2.3"
 MAX_RESPONSE_BYTES = 64_000
 MAX_ROUTE_CONFIG_BYTES = 2_048
 MAX_RUNS_PER_POLL = 100
@@ -325,7 +326,11 @@ def main(route: RouteBinding | None = None) -> None:
 
     request = Request(
         f"{base_url}/runs?{urlencode({'limit': MAX_RUNS_PER_POLL, 'organizationId': route.organization_id, 'projectId': route.project_id})}",
-        headers={"Accept": "application/json", "Authorization": f"Bearer {credential}"},
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {credential}",
+            "User-Agent": USER_AGENT,
+        },
         method="GET",
     )
     try:

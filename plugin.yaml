@@ -1,5 +1,5 @@
 name: tern
-version: 0.2.2
+version: 0.2.3
 manifest_version: 1
 api_version: 1
 description: Safely run multi-project Tern delegations with Hermes Agent
