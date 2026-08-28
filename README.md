@@ -106,6 +106,21 @@ scheduler skill copy, and Tern cron jobs. Project mappings remain in the
 Hermes plugin settings so reconnecting does not require re-entering local
 paths.
 
+## Update or remove
+
+```sh
+hermes plugins update tern
+hermes plugins doctor tern --ci
+```
+
+To remove the integration cleanly, disconnect it before uninstalling the
+plugin:
+
+```sh
+hermes tern disconnect
+hermes plugins remove tern
+```
+
 ## Security model
 
 - Pull polling is the supported transport. No inbound public webhook is
