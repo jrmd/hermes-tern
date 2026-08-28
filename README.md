@@ -9,9 +9,15 @@ Git checkouts without guessing where work belongs.
 The release repository is designed to install directly with Hermes:
 
 ```sh
-hermes plugins install jrmd/hermes-tern --enable
+hermes plugins install jrmd/hermes-tern --enable --force
 hermes plugins doctor tern --ci
 ```
+
+Hermes marks community plugins that execute subprocesses as `CAUTION` and
+requires the explicit `--force` acknowledgement. This plugin executes only
+argument-vector subprocesses for exact Git-root validation and an optional
+Hermes gateway restart. Review [SECURITY.md](SECURITY.md) and the source before
+installing, as you should for any coding-agent plugin.
 
 For development from the Tern monorepo:
 
