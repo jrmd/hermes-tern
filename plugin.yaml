@@ -1,0 +1,31 @@
+name: tern
+version: 0.2.0
+manifest_version: 2
+api_version: 1
+description: Safely run multi-project Tern delegations with Hermes Agent
+kind: standalone
+license: MIT
+author: JRMD
+homepage: https://github.com/jrmd/hermes-tern
+tags: [project-management, coding-agent, delegation, runner]
+provides_tools:
+  - tern_claim_next
+  - tern_progress
+  - tern_finish
+  - tern_run_status
+requires_env:
+  - name: TERN_RUNNER_CREDENTIAL
+    description: One-time credential from the Tern runner instance
+    url: https://gettern.app
+    secret: true
+config_schema:
+  endpoint:
+    type: str
+    default: https://gettern.app/api/runner/v1
+    description: Tern runner protocol endpoint
+  routing:
+    type: dict
+    description: Versioned exact organization/project to local checkout mappings
+  scheduler:
+    type: dict
+    description: Shared schedule and optional Hermes model overrides
