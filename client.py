@@ -14,7 +14,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 DEFAULT_BASE_URL = "https://gettern.app/api/runner/v1"
-DEFAULT_CAPABILITIES = ("progress", "artifacts")
+DEFAULT_CAPABILITIES = ("progress", "artifacts", "evidence", "proposals", "issue_updates", "pull")
 RETRYABLE_HTTP_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
 RETRYABLE_PROTOCOL_CODES = frozenset({"rate_limited", "temporarily_unavailable"})
 
@@ -189,7 +189,7 @@ class RunnerClient:
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self._credential}",
-            "User-Agent": "hermes-tern-plugin/0.2.3",
+            "User-Agent": "hermes-tern-plugin/0.2.4",
         }
         if encoded is not None:
             headers["Content-Type"] = "application/json"
@@ -307,6 +307,35 @@ class RunnerClient:
             },
         )
         self._expect_operation(result, "report")
+        return result
+
+    def update_issue_status(
+        self,
+        run_id: str,
+        attempt_id: str,
+        lease_token: str,
+        idempotency_key: str,
+        capabilities: list[str],
+        status: str,
+        expected_version: int,
+    ) -> dict[str, Any]:
+        update: dict[str, Any] = {
+            "status": status,
+            "expectedVersion": expected_version,
+        }
+        result = self.request_json(
+            "POST",
+            f"runs/{run_id}/attempts/{attempt_id}/status",
+            {
+                "runId": run_id,
+                "attemptId": attempt_id,
+                "leaseToken": lease_token,
+                "idempotencyKey": idempotency_key,
+                "capabilities": capabilities,
+                "update": update,
+            },
+        )
+        self._expect_operation(result, "update_issue_status")
         return result
 
     def finish(

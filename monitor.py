@@ -20,7 +20,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 DEFAULT_BASE_URL = "https://gettern.app/api/runner/v1"
-USER_AGENT = "hermes-tern-plugin/0.2.3"
+USER_AGENT = "hermes-tern-plugin/0.2.4"
 MAX_RESPONSE_BYTES = 64_000
 MAX_ROUTE_CONFIG_BYTES = 2_048
 MAX_RUNS_PER_POLL = 100

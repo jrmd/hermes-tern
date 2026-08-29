@@ -5,6 +5,7 @@ from typing import Any
 
 import _plugin  # noqa: F401 - registers the standalone package under test
 from tern_plugin_under_test.runtime import RunnerSession
+from tern_plugin_under_test.client import RunnerProtocolError
 
 
 class FakeClient:
@@ -47,12 +48,14 @@ class FakeClient:
                 "authority": {
                     "organizationId": "org-1",
                     "projectId": "project-1",
-                    "actionMode": "proposal_only",
-                    "allowedActions": ["read", "analysis"],
+                    "actionMode": "safe_automatic",
+                    "allowedActions": ["read", "analysis", "issue_update"],
+                    "capabilities": ["progress", "artifacts", "issue_updates"],
                 },
+                "workflow": {"kind": "coding", "requiredArtifactKinds": ["commit", "pull_request"]},
                 "content": [{"kind": "issue", "title": "Task", "untrusted": True}],
             },
-            "reporting": {"capabilities": ["progress", "artifacts"]},
+            "reporting": {"capabilities": ["progress", "artifacts", "issue_updates"]},
         }
 
     def renew(self, *args: Any) -> dict[str, Any]:
@@ -72,6 +75,17 @@ class FakeClient:
     def finish(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("finish", args))
         return {"operation": "finish"}
+
+    def update_issue_status(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("update_issue_status", args))
+        return {"operation": "update_issue_status"}
+
+
+class MissingReportingClient(FakeClient):
+    def claim(self, run_id: str, key: str) -> dict[str, Any]:
+        result = super().claim(run_id, key)
+        result.pop("reporting", None)
+        return result
 
 
 class RunnerSessionTests(unittest.TestCase):
@@ -104,6 +118,13 @@ class RunnerSessionTests(unittest.TestCase):
         self.assertEqual([name for name, _ in client.calls], ["list", "claim", "renew"])
         self.assertTrue(session.status()["active"])
 
+    def test_claim_requires_the_server_reporting_contract(self) -> None:
+        client = MissingReportingClient()
+        session = self.session(client)
+        with self.assertRaisesRegex(RunnerProtocolError, "reporting contract"):
+            session.claim_next("org-1", "project-1")
+        self.assertEqual([name for name, _ in client.calls], ["list", "claim"])
+
     def test_progress_renews_and_uses_distinct_keys(self) -> None:
         client = FakeClient()
         session = self.session(client)
@@ -132,6 +153,31 @@ class RunnerSessionTests(unittest.TestCase):
         self.assertEqual(wire_result["knownGaps"], ["PR not pushed"])
         self.assertTrue(wire_result["runnerReceipt"].startswith("hermes-receipt:"))
         self.assertFalse(session.status()["active"])
+
+    def test_coding_success_requires_commit_and_pull_request_artifacts(self) -> None:
+        client = FakeClient()
+        session = self.session(client)
+        session.claim_next("org-1", "project-1")
+        with self.assertRaisesRegex(RunnerProtocolError, "required artifacts"):
+            session.finish(
+                outcome="succeeded",
+                summary="Done",
+                work_performed="Implemented the requested change.",
+            )
+        self.assertEqual([name for name, _ in client.calls].count("finish"), 0)
+        self.assertTrue(session.status()["active"])
+
+    def test_update_issue_status_uses_claimed_run_and_issue_version(self) -> None:
+        client = FakeClient()
+        session = self.session(client)
+        session.claim_next("org-1", "project-1")
+        result = session.update_issue_status("in_progress", expected_version=7)
+        self.assertEqual(result["status"], "updated")
+        update_args = next(args for name, args in client.calls if name == "update_issue_status")
+        self.assertEqual(update_args[:4], ("run-1", "attempt-1", "rotated-lease-token-2", "hermes-status:run-1:attempt-1:1"))
+        self.assertEqual(update_args[4], ["progress", "artifacts", "issue_updates"])
+        self.assertEqual(update_args[5], "in_progress")
+        self.assertEqual(update_args[6], 7)
 
     def test_second_claim_does_not_claim_more_work(self) -> None:
         client = FakeClient()

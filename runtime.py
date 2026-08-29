@@ -36,6 +36,7 @@ class ActiveAttempt:
     capabilities: list[str]
     renewal_number: int = 0
     report_number: int = 0
+    status_number: int = 0
     lease_error: RunnerProtocolError | None = None
     stop_event: threading.Event = field(default_factory=threading.Event)
     heartbeat: threading.Thread | None = None
@@ -76,9 +77,19 @@ class RunnerSession:
         if not isinstance(lease, dict) or not isinstance(lease.get("leaseToken"), str):
             raise RunnerProtocolError("Tern claim response did not contain a lease", code="invalid_response")
         context = claim.get("context") if isinstance(claim.get("context"), dict) else {}
-        reporting = claim.get("reporting") if isinstance(claim.get("reporting"), dict) else {}
+        reporting = claim.get("reporting")
+        if not isinstance(reporting, dict):
+            raise RunnerProtocolError(
+                "Tern claim response did not contain a reporting contract",
+                code="invalid_response",
+            )
         effective = reporting.get("capabilities")
-        capabilities = [value for value in DEFAULT_CAPABILITIES if not isinstance(effective, list) or value in effective]
+        if not isinstance(effective, list):
+            raise RunnerProtocolError(
+                "Tern reporting contract did not contain capabilities",
+                code="invalid_response",
+            )
+        capabilities = [value for value in DEFAULT_CAPABILITIES if value in effective]
         return ActiveAttempt(
             client=client,
             run=run,
@@ -287,6 +298,77 @@ class RunnerSession:
             )
             return {"status": "reported", "runId": active.run_id, "response": result}
 
+    @staticmethod
+    def _missing_required_artifacts(
+        context: dict[str, Any], artifacts: list[dict[str, Any]],
+    ) -> list[str]:
+        workflow = context.get("workflow")
+        if not isinstance(workflow, dict):
+            return []
+        required = workflow.get("requiredArtifactKinds")
+        if not isinstance(required, list):
+            return []
+        reported = {
+            str(artifact.get("type") or artifact.get("kind"))
+            for artifact in artifacts
+            if isinstance(artifact, dict) and (artifact.get("type") or artifact.get("kind"))
+        }
+        return [str(kind) for kind in required if isinstance(kind, str) and kind not in reported]
+
+    def update_issue_status(
+        self,
+        status: str,
+        *,
+        expected_version: int,
+    ) -> dict[str, Any]:
+        clean_status = status.strip()
+        if not clean_status or len(clean_status) > 48 or not all(
+            character.islower() or character.isdigit() or character == "_"
+            for character in clean_status
+        ) or clean_status.startswith("_") or clean_status.endswith("_") or "__" in clean_status:
+            raise ValueError("Status must be lowercase snake_case and 48 characters or fewer")
+        if not isinstance(expected_version, int) or isinstance(expected_version, bool) or expected_version < 1:
+            raise ValueError("expected_version must be a positive integer")
+        with self._lock:
+            active = self._active_or_error()
+            authority = active.context.get("authority")
+            if not isinstance(authority, dict):
+                authority = active.context.get("policy")
+            if not isinstance(authority, dict) or authority.get("actionMode") != "safe_automatic":
+                raise RunnerProtocolError(
+                    "This run does not permit safe automatic issue_update status changes",
+                    code="capability_not_allowed",
+                )
+            allowed = authority.get("allowedActions")
+            policy_capabilities = authority.get("capabilities")
+            if not isinstance(allowed, list) or "issue_update" not in allowed:
+                raise RunnerProtocolError(
+                    "This run is not allowed to perform the issue_update status action",
+                    code="capability_not_allowed",
+                )
+            if not isinstance(policy_capabilities, list) or "issue_updates" not in policy_capabilities:
+                raise RunnerProtocolError(
+                    "This run is not configured for issue status updates",
+                    code="capability_not_allowed",
+                )
+            if "issue_updates" not in active.capabilities:
+                raise RunnerProtocolError(
+                    "This runner does not advertise issue_updates",
+                    code="capability_not_allowed",
+                )
+            self._renew_locked(active)
+            active.status_number += 1
+            response = active.client.update_issue_status(
+                active.run_id,
+                active.attempt_id,
+                active.lease_token,
+                f"hermes-status:{active.run_id}:{active.attempt_id}:{active.status_number}",
+                active.capabilities,
+                clean_status,
+                expected_version,
+            )
+            return {"status": "updated", "runId": active.run_id, "response": response}
+
     def finish(
         self,
         *,
@@ -312,6 +394,12 @@ class RunnerSession:
             raise ValueError("Artifacts are limited to 50 entries")
         with self._lock:
             active = self._active_or_error()
+            missing = self._missing_required_artifacts(active.context, clean_artifacts)
+            if outcome == "succeeded" and missing:
+                raise RunnerProtocolError(
+                    "Cannot report succeeded; required artifacts are missing: " + ", ".join(missing),
+                    code="completion_requirements_missing",
+                )
             self._renew_locked(active)
             result = {
                 "outcome": outcome,

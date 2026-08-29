@@ -42,7 +42,7 @@ TERN_PROGRESS = {
 
 TERN_FINISH = {
     "name": "tern_finish",
-    "description": "Finish the currently claimed Tern run. Call exactly once after work and proportional verification, including any honest gaps.",
+    "description": "Finish the currently claimed Tern run. For coding workflows, report succeeded only after the required commit and pull request artifacts are observed; otherwise use needs_review or blocked with honest gaps.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -54,7 +54,19 @@ TERN_FINISH = {
                 "type": "array",
                 "description": "Canonical Tern artifacts only; omit rather than inventing links.",
                 "maxItems": 50,
-                "items": {"type": "object"},
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "minLength": 1, "maxLength": 160},
+                        "kind": {"type": "string", "enum": ["issue", "pull_request", "commit", "document", "screenshot", "log", "url", "other"]},
+                        "label": {"type": "string", "minLength": 1, "maxLength": 240},
+                        "uri": {"type": "string", "format": "uri", "maxLength": 2048},
+                        "description": {"type": "string", "maxLength": 2000},
+                        "metadata": {"type": "object"},
+                    },
+                    "required": ["id", "kind", "label", "uri"],
+                    "additionalProperties": False,
+                },
             },
         },
         "required": ["outcome", "summary", "work_performed"],
@@ -66,4 +78,18 @@ TERN_RUN_STATUS = {
     "name": "tern_run_status",
     "description": "Inspect whether this Hermes process currently owns a Tern run and whether its lease is healthy.",
     "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+}
+
+TERN_UPDATE_ISSUE_STATUS = {
+    "name": "tern_update_issue_status",
+    "description": "Update only the linked Tern issue status for the current run. Use the issue version from the frozen context; this requires a safe-automatic issue_updates capability.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$", "description": "Target issue status in lowercase snake_case."},
+            "expected_version": {"type": "integer", "minimum": 1, "description": "Issue version from the frozen run context."},
+        },
+        "required": ["status", "expected_version"],
+        "additionalProperties": False,
+    },
 }

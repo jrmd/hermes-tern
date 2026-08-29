@@ -106,6 +106,20 @@ scheduler skill copy, and Tern cron jobs. Project mappings remain in the
 Hermes plugin settings so reconnecting does not require re-entering local
 paths.
 
+## Delegated workflow behavior
+
+The plugin exposes `tern_update_issue_status`, but it can update only the
+issue linked to the currently leased run. Tern must grant the run a
+`safe_automatic` policy with the `issue_updates` capability, and the call must
+include the issue version from the immutable context. A stale version is
+rejected rather than silently overwriting a newer change.
+
+For coding workflows, `tern_finish` accepts `succeeded` only when the result
+contains observed `commit` and `pull_request` artifacts. The plugin does not
+create, push, or verify those artifacts itself: Hermes must perform that work
+with its local Git/provider tools, and should report `needs_review` or
+`blocked` when delivery is incomplete.
+
 ## Update or remove
 
 ```sh

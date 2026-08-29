@@ -253,7 +253,7 @@ class MonitorTests(unittest.TestCase):
         self.assertIsNotNone(opener.request)
         self.assertEqual(
             opener.request.get_header("User-agent"),
-            "hermes-tern-plugin/0.2.3",
+            "hermes-tern-plugin/0.2.4",
         )
         self.assertEqual(output.getvalue(), '{"runs":[],"state":"ready"}\n')
 

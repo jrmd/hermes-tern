@@ -95,6 +95,33 @@ class RunnerClientTests(unittest.TestCase):
         self.assertEqual(requests[0][0], "claim-key")
         self.assertEqual(sleeps, [0.25])
 
+    def test_status_update_uses_bound_request_and_idempotency_header(self) -> None:
+        seen: list[Request] = []
+
+        def transport(request: Request, timeout: float, max_bytes: int) -> TransportResponse:
+            del timeout, max_bytes
+            seen.append(request)
+            return response(200, {"data": {"operation": "update_issue_status", "issue": {"status": "in_progress"}}})
+
+        client = RunnerClient(
+            "https://gettern.app/api/runner/v1",
+            "credential-sentinel",
+            transport=transport,
+        )
+        result = client.update_issue_status(
+            "run-1",
+            "attempt-1",
+            "lease-token-long-enough",
+            "status-key",
+            ["issue_updates"],
+            "in_progress",
+            7,
+        )
+        self.assertEqual(result["issue"]["status"], "in_progress")
+        self.assertEqual(seen[0].full_url, "https://gettern.app/api/runner/v1/runs/run-1/attempts/attempt-1/status")
+        self.assertEqual(seen[0].get_header("Idempotency-key"), "status-key")
+        self.assertIn(b'"expectedVersion":7', seen[0].data or b"")
+
     def test_non_retryable_error_is_bounded_and_sanitized(self) -> None:
         def transport(request: Request, timeout: float, max_bytes: int) -> TransportResponse:
             del request, timeout, max_bytes

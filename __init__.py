@@ -49,6 +49,12 @@ def register(ctx):
         schema=schemas.TERN_RUN_STATUS,
         handler=registered["tern_run_status"],
     )
+    ctx.register_tool(
+        name="tern_update_issue_status",
+        toolset="tern",
+        schema=schemas.TERN_UPDATE_ISSUE_STATUS,
+        handler=registered["tern_update_issue_status"],
+    )
     ctx.register_cli_command(
         name="tern",
         help="Connect Hermes to Tern and manage delegated runs",

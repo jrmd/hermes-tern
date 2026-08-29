@@ -96,9 +96,19 @@ def handlers(session: RunnerSession) -> dict[str, Callable[..., str]]:
         del args, kwargs
         return _json_result(session.status)
 
+    def update_issue_status(args: dict[str, Any], **kwargs: Any) -> str:
+        del kwargs
+        return _json_result(
+            lambda: session.update_issue_status(
+                str(args.get("status", "")),
+                expected_version=int(args.get("expected_version", 0)),
+            )
+        )
+
     return {
         "tern_claim_next": claim_next,
         "tern_progress": progress,
         "tern_finish": finish,
         "tern_run_status": status,
+        "tern_update_issue_status": update_issue_status,
     }

@@ -1,5 +1,5 @@
 name: tern
-version: 0.2.3
+version: 0.2.4
 manifest_version: 1
 api_version: 1
 description: Safely run multi-project Tern delegations with Hermes Agent
@@ -13,6 +13,7 @@ provides_tools:
   - tern_progress
   - tern_finish
   - tern_run_status
+  - tern_update_issue_status
 requires_env:
   - name: TERN_RUNNER_CREDENTIAL
     description: One-time credential from the Tern runner instance
